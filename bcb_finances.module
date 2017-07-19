@@ -1,0 +1,255 @@
+<?php
+
+
+/**
+ * Implements hook_menu().
+ */
+function bcb_finances_menu() {
+  return [
+    'admin/bcb_finances/rates' => [
+      'title' => t('Configurações dos indicadores'),
+      'descriptions' => t('Configure os indicadores do mercado.'),
+      'page callback' => '_bcb_finances_rates_list',
+      'access arguments' => ['manage bcb finances'],
+    ],
+    'admin/bcb_finances/rates/tax/new' => [
+      'title' => t('Nova Taxa'),
+      'descriptions' => t('Cria nova taxa de cambio'),
+      'page callback' => 'drupal_get_form',
+      'page arguments' => ['bcb_finances_admin_tax_form'],
+      'access arguments' => ['manage bcb finances'],
+      'file' => 'includes/bcb_finances_taxes.inc',
+    ],
+    'admin/bcb_finances/rates/tax/%/delete' => [
+      'title' => t('Excluir Taxa'),
+      'descriptions' => t('Exclui uma taxa'),
+      'page callback' => 'bcb_finances_tax_delete_action',
+      'page arguments' => [4],
+      'access arguments' => ['manage bcb finances'],
+      'file' => 'includes/bcb_finances_taxes.inc',
+      'type' => MENU_CALLBACK,
+    ],
+    'admin/bcb_finances/rates/simple-rate/new' => [
+      'title' => t('Novo Indicador'),
+      'descriptions' => t('Cria novo indicador'),
+      'page callback' => 'drupal_get_form',
+      'page arguments' => ['bcb_finances_admin_simple_rates_form'],
+      'access arguments' => ['manage bcb finances'],
+      'file' => 'includes/bcb_finances_rates.inc',
+    ],
+    'admin/bcb_finances/rates/simple-rate/%/delete' => [
+      'title' => t('Excluir Indicador'),
+      'descriptions' => t('Exclui um indicador'),
+      'page callback' => 'bcb_finances_simple_rate_delete_action',
+      'page arguments' => [4],
+      'access arguments' => ['manage bcb finances'],
+      'file' => 'includes/bcb_finances_rates.inc',
+      'type' => MENU_CALLBACK,
+    ],
+    'admin/bcb_finances/rates/preview' => [
+      'title' => t('Previsualização dos Indicadores'),
+      'descriptions' => t('Veja como ficará a tabela dos indicadores.'),
+      'page callback' => 'bcb_finances_preview_callback_render',
+      'access arguments' => ['manage bcb finances'],
+    ],
+  ];
+}
+
+
+/**
+ * Implements hook_permission().
+ */
+function bcb_finances_permission() {
+  return [
+    'manage bcb finances' => [
+      'title' => 'Administrar Indicadores.',
+      'description' => 'Administrar e cadastrar taxa para indicadores.',
+    ],
+  ];
+}
+
+/**
+ * Implements hook_theme().
+ */
+function bcb_finances_theme() {
+  return [
+    'bcb_finances_admin_page' => [
+      'variables' => ['data' => NULL],
+      'template' => 'templates/bcb_finances_admin_page',
+    ],
+    'bcb_finances_taxes_list' => [
+      'variables' => ['data' => NULL],
+      'template' => 'templates/bcb_finances_taxes_list',
+    ],
+    'bcb_finances_rates_list' => [
+      'variables' => ['data' => NULL],
+      'template' => 'templates/bcb_finances_rates_list',
+    ],
+  ];
+}
+
+/**
+ * Callback to test output
+ *
+ * @return string
+ */
+function bcb_finances_preview_callback_render() {
+  module_load_include('inc', 'bcb_finances', 'includes/bcb_finances_taxes');
+  module_load_include('inc', 'bcb_finances', 'includes/bcb_finances_rates');
+  return bcb_finances_get_rates_table();
+}
+
+/**
+ * Get the html of the taxes table for display on admin
+ *
+ * @return string
+ */
+function _bcb_finances_rates_list() {
+  module_load_include('inc', 'bcb_finances', 'includes/bcb_finances_taxes');
+  $taxes = _bcb_finances_get_taxes();
+  if (!empty($taxes)) {
+    foreach ($taxes as $key => $tax) {
+      $_tax = (array) $tax;
+      $_tax['buy_serie_code'] = _bcb_finances_get_rate_serie_name($_tax['buy_serie_code']);
+      $_tax['sell_serie_code'] = _bcb_finances_get_rate_serie_name($_tax['sell_serie_code']);
+      $_tax['delete_button'] = l('Excluir', 'admin/bcb_finances/rates/tax/' . $tax->id . '/delete');
+      $taxes[$key] = $_tax;
+    }
+  }
+
+  module_load_include('inc', 'bcb_finances', 'includes/bcb_finances_rates');
+  $rates = _bcb_finances_get_simple_rates();
+  if (!empty($rates)) {
+    foreach ($rates as $key => $rate) {
+      $_rate = (array) $rate;
+      $_rate['serie_code'] = _bcb_finances_get_rate_serie_name($_rate['serie_code']);
+      $_rate['delete_button'] = l('Excluir', 'admin/bcb_finances/rates/simple-rate/' . $rate->id . '/delete');
+      $rates[$key] = $_rate;
+    }
+  }
+
+  return theme('bcb_finances_admin_page', [
+    'data' => [
+      'taxes' => $taxes,
+      'rates' => $rates,
+    ],
+  ]);
+}
+
+/**
+ * Returns the taxes cached data, if doesn't exists cached data
+ * It generates and store the data.
+ *
+ * @return array|mixed
+ */
+function _bcb_finances_get_taxes_cached_data() {
+  $cachedTaxes = &drupal_static(__FUNCTION__);
+  if (!isset($cachedTaxes)) {
+    if ($cache = cache_get('bcb_finances_taxes')) {
+      $cachedTaxes = $cache->data;
+    }
+    else {
+      module_load_include('inc', 'bcb_finances', 'includes/bcb_finances_taxes');
+      $retriever = bcb_finances_retriever();
+      $taxes = _bcb_finances_get_taxes();
+      $cachedTaxes = [];
+      foreach ($taxes as $tax) {
+        $buyData = _bcb_transpile_data_from_xml($retriever->searchLastSerieValue((int) $tax->buy_serie_code));
+        $sellData = _bcb_transpile_data_from_xml($retriever->searchLastSerieValue((int) $tax->sell_serie_code));
+        $cachedTaxes[$tax->id] = [
+          'name' => $tax->tax_name,
+          'buy_data' => $buyData,
+          'sell_data' => $sellData,
+        ];
+      }
+
+      cache_set('bcb_finances_taxes', $cachedTaxes, 'cache');
+    }
+
+  }
+  return $cachedTaxes;
+}
+
+/**
+ * Returns the rates cached data, if doesn't exists cached data
+ * It generates and store the data.
+ *
+ * @return array|mixed
+ */
+function _bcb_finances_get_rates_cached_data() {
+  $cachedRates = &drupal_static(__FUNCTION__);
+  if (!isset($cachedRates)) {
+    if ($cache = cache_get('bcb_finances_rates')) {
+      $cachedRates = $cache->data;
+    }
+    else {
+      module_load_include('inc', 'bcb_finances', 'includes/bcb_finances_rates');
+      $retriever = bcb_finances_retriever();
+      $rates = _bcb_finances_get_simple_rates();
+      $cachedRates = [];
+      foreach ($rates as $rate) {
+        $serieData = _bcb_transpile_data_from_xml($retriever->searchLastSerieValue((int) $rate->serie_code));
+        $cachedRates[$rate->id] = [
+          'name' => $rate->rate_name,
+          'serie_data' => $serieData,
+        ];
+      }
+
+      cache_set('bcb_finances_rates', $cachedRates, 'cache');
+    }
+
+  }
+  return $cachedRates;
+}
+
+/**
+ * Convert the data and put on array the data retrieved from BCB Webservice
+ *
+ * @param $data
+ *
+ * @return array
+ */
+function _bcb_transpile_data_from_xml($data) {
+  /** @var \SimpleXMLElement $info */
+  $info = simplexml_load_string($data);
+  /** @var \SimpleXMLElement $serie */
+  $serie = $info->SERIE;
+  return [
+    'nome' => utf8_decode($serie->NOME),
+    'codigo' => (int) $serie->CODIGO,
+    'periodicidade' => (string) $serie->PERIODICIDADE,
+    'unidade' => (string) $serie->UNIDADE,
+    'data' => implode('/', (array) $serie->DATA),
+    'valor' => (double) str_replace(',', '.', $serie->VALOR),
+  ];
+}
+
+/**
+ * @return \BCB\Retriever
+ */
+function bcb_finances_retriever() {
+  $retriever = &drupal_static(__FUNCTION__);
+  if (!isset($retriever)) {
+    module_load_include('php', 'bcb_finances', 'includes/lib/vendor/autoload');
+    $retriever = new \BCB\Retriever();
+  }
+
+  return $retriever;
+}
+
+function bcb_finances_get_fieldset($content, $title, $description = '') {
+  drupal_add_library('system', 'drupal.collapse');
+  $vars = [
+    'element' => [
+      '#attributes' => ['class' => ['collapsible', 'collapsed']],
+      '#children' => $content,
+      '#collapsed' => FALSE,
+      '#collapsible' => TRUE,
+      '#description' => $description,
+      '#id' => strtolower(str_replace(' ', '-', $title)),
+      '#title' => $title,
+    ],
+  ];
+
+  return theme_fieldset($vars);
+}

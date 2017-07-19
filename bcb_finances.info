@@ -1,0 +1,4 @@
+name = BCB Finances
+description = Integrate Finance data from Banco Central do Brasil webservice
+version = "7.x-0.1"
+core = 7.x

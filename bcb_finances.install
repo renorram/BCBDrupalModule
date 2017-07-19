@@ -1,0 +1,188 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: renorram
+ * Date: 04/07/17
+ * Time: 19:58
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function bcb_finances_schema() {
+
+  $schema['bcb_finances_rate_type'] = [
+    'description' => 'Table with the default taxes series with code and name',
+    'fields' => [
+      'id' => [
+        'description' => 'The primary identifier for a rate type',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'rate_type_name' => [
+        'description' => 'The name of the rate type',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ],
+      'rate_type_short_name' => [
+        'description' => 'The short name of the rate type',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ],
+    ],
+    'primary key' => ['id'],
+    'unique keys' => [
+      'rate_type_short_name' => ['rate_type_short_name'],
+    ],
+  ];
+
+  $schema['bcb_finances_rate_serie'] = [
+    'description' => 'Table with the default taxes series with code and name',
+    'fields' => [
+      'id' => [
+        'description' => 'The primary identifier for a rate serie',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'rate_serie_name' => [
+        'description' => 'The name of the rate serie',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ],
+      'rate_serie_code' => [
+        'description' => 'The rate serie code',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'rate_serie_type' => [
+        'description' => 'The id of the type of the serie.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+    ],
+    'primary key' => ['id'],
+    'unique keys' => [
+      'tax_code' => ['rate_serie_code'],
+    ],
+    'foreign keys' => [
+      'rate_serie_type_fk' => [
+        'table' => 'bcb_finances_rate_type',
+        'columns' => ['rate_serie_type' => 'id'],
+      ],
+    ],
+  ];
+
+  $schema['bcb_finances_tax'] = [
+    'description' => 'Table with registered buy and sell taxes',
+    'fields' => [
+      'id' => [
+        'description' => 'The primary identifier for a tax',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'tax_name' => [
+        'description' => 'The name of the tax',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ],
+      'buy_serie_code' => [
+        'description' => 'The tax buy serie code',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'sell_serie_code' => [
+        'description' => 'The tax sell serie code',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+    ],
+    'primary key' => ['id'],
+    'foreign keys' => [
+      'buy_serie_code_fk' => [
+        'table' => 'bcb_finances_rate_serie',
+        'columns' => ['buy_serie_code' => 'rate_serie_code'],
+      ],
+      'sell_serie_code_fk' => [
+        'table' => 'bcb_finances_rate_serie',
+        'columns' => ['sell_serie_code' => 'rate_serie_code'],
+      ],
+    ],
+  ];
+
+  $schema['bcb_finances_simple_rates'] = [
+    'description' => 'Table with simple rates to be used on site.',
+    'fields' => [
+      'id' => [
+        'description' => 'The primary identifier for the rate',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'rate_name' => [
+        'description' => 'The name of the rate',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ],
+      'serie_code' => [
+        'description' => 'The serie code.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+    ],
+    'primary key' => ['id'],
+    'foreign keys' => [
+      'serie_code_fk' => [
+        'table' => 'bcb_finances_rate_serie',
+        'columns' => ['serie_code', 'rate_serie_code'],
+      ],
+    ],
+  ];
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function bcb_finances_install() {
+  module_load_include('php', 'bcb_finances', 'includes/lib/vendor/autoload');
+  $retriever = new \BCB\Retriever();
+  $dataTypes = $retriever->availableDataClasses();
+  foreach ($dataTypes as $dataType) {
+    $registerDataType = new stdClass();
+    $registerDataType->rate_type_name = $dataType['name'];
+    $registerDataType->rate_type_short_name = $dataType['short_name'];
+    drupal_write_record('bcb_finances_rate_type', $registerDataType);
+
+    $rateTypeId = db_select('bcb_finances_rate_type', 'b')
+      ->fields('b', ['id'])
+      ->condition('rate_type_short_name', $dataType['short_name'])
+      ->execute()->fetchColumn();
+
+    $data = $retriever->getClassData($dataType['short_name'])->getData();
+
+    // Store the base data for the module use
+    foreach ($data as $taxe) {
+      $register = new stdClass();
+      $register->rate_serie_code = $taxe['oid'];
+      $register->rate_serie_name = $taxe['nomeAbreviado'];
+      $register->rate_serie_type = $rateTypeId;
+      drupal_write_record('bcb_finances_rate_serie', $register);
+    }
+  }
+
+
+}
