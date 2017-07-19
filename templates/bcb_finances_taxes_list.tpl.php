@@ -15,10 +15,10 @@ $table_vars = [
     ['data' => 'Venda'],
   ],
   'rows' => $rows,
-  'attributes' => [],
-  'caption' => 'Tabela de Taxas',
+  'attributes' => ['class' => ['table', 'table-striped', 'table-hover']],
+  'caption' => 'Câmbio',
   'colgroups' => [],
-  'sticky' => TRUE,
+  'sticky' => FALSE,
   'empty' => t('No results found.'),
 ];
 print theme_table($table_vars);

@@ -91,7 +91,8 @@ abstract class AbstractRate {
 
   public function validateData(array $data) {
 
-    if (empty($data) || empty(array_filter($data, 'is_array'))) {
+    $data = array_filter($data, 'is_array');
+    if (empty($data)) {
       throw new \InvalidArgumentException('Data array is empty');
     }
 
