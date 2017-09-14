@@ -1,9 +1,11 @@
 <?php
 $rows = [];
-foreach ($data as $rates) {
+foreach ($data as $idRate => $rate) {
+  $additional = bcb_finances_simple_rate_get_prefix_suffix($idRate);
+  $valor = $additional['prefix'] . $rate['serie_data']['valor'] . $additional['suffix'];
   $rows[] = [
-    $rates['name'],
-    $rates['serie_data']['valor'],
+    $rate['name'],
+    $valor,
   ];
 }
 
@@ -17,3 +19,13 @@ $table_vars = [
   'empty' => t('No results found.'),
 ];
 print theme_table($table_vars);
+
+$lastUpdate = variable_get('bcb_finances_rates_last_update', time());
+$date = (new DateTime())->setTimestamp($lastUpdate)
+  ->setTimezone(new DateTimeZone('America/Fortaleza'))
+  ->format('d/m/Y H:i');
+$l = l('Banco Central do Brasil', 'https://www.bcb.gov.br/pt-br/', [
+  'external' => TRUE,
+  'attributes' => ['target' => '_blank'],
+]);
+print "<small>Última atualização ás $date.<br>Fonte: $l</small>";

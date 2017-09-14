@@ -5,6 +5,7 @@
  * Date: 19/07/17
  * Time: 11:15
  */
+/** Includes base data file */
 module_load_include('inc', 'bcb_finances', 'includes/bcb_finances_data');
 /**
  * Get all rates, optional $conditions arguments to filter
@@ -34,7 +35,10 @@ function _bcb_finances_get_simple_rates($conditions = []) {
  */
 function _bcb_finances_simple_rate_insert($data) {
   if (_bcb_finances_check_rate_serie_exists('rate_serie_code', $data->serie_code)) {
-    return drupal_write_record('bcb_finances_simple_rates', $data);
+    $insert = db_insert('bcb_finances_simple_rates')
+      ->fields((array) $data)
+      ->execute();
+    return $insert != NULL;
   }
   watchdog('bcb_finances', 'Não foi possível salvar, código de Série @code inválido.', ['@code' => $data->serie_code]);
   return FALSE;
@@ -66,6 +70,23 @@ function bcb_finances_simple_rate_delete_action($id) {
     drupal_set_message('Erro ao tentar excluir registro!', 'error');
   }
   drupal_goto('admin/bcb_finances/rates');
+}
+
+/**
+ * Get simple rate prefix and suffix
+ *
+ * @param $id
+ *
+ * @return array|bool
+ */
+function bcb_finances_simple_rate_get_prefix_suffix($id) {
+  $rateResult = _bcb_finances_get_simple_rates(['id' => $id]);
+  // rate id not found result
+  if (empty($rateResult)) {
+    return FALSE;
+  }
+  $rate = current($rateResult);
+  return ['prefix' => $rate->prefix, 'suffix' => $rate->suffix];
 }
 
 /**
@@ -106,6 +127,16 @@ function bcb_finances_admin_simple_rates_form() {
     '#required' => TRUE,
   ];
 
+  $form['prefix'] = [
+    '#type' => 'textfield',
+    '#title' => 'Prefixo',
+  ];
+
+  $form['suffix'] = [
+    '#type' => 'textfield',
+    '#title' => 'Sufixo',
+  ];
+
 
   // Set a submit handler manually because the default submit handler
   // gets overridden by the system_settings_form() submit handler.
@@ -126,7 +157,9 @@ function bcb_finances_admin_simple_rates_form_submit($form, &$form_state) {
   $data = new stdClass();
   $data->rate_name = $values['rate_name'];
   $data->serie_code = $values['serie_code'];
-  if (_bcb_finances_simple_rate_insert($data) == SAVED_NEW) {
+  $data->prefix = $values['prefix'];
+  $data->suffix = $values['suffix'];
+  if (_bcb_finances_simple_rate_insert($data)) {
     cache_clear_all('bcb_finances_rates', 'cache');
     drupal_set_message('Registro salvo com sucesso!.');
   }

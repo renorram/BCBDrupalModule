@@ -1,5 +1,6 @@
 <?php
-
+/** BCB finances default caching time, caching the data for 1 hour */
+define('BCB_FINANCES_CACHE_TIME', time() + (60 * 60));
 
 /**
  * Implements hook_menu().
@@ -163,7 +164,8 @@ function _bcb_finances_get_taxes_cached_data() {
         ];
       }
 
-      cache_set('bcb_finances_taxes', $cachedTaxes, 'cache');
+      cache_set('bcb_finances_taxes', $cachedTaxes, 'cache', BCB_FINANCES_CACHE_TIME);
+      variable_set('bcb_finances_taxes_last_update', time());
     }
 
   }
@@ -195,7 +197,8 @@ function _bcb_finances_get_rates_cached_data() {
         ];
       }
 
-      cache_set('bcb_finances_rates', $cachedRates, 'cache');
+      cache_set('bcb_finances_rates', $cachedRates, 'cache', BCB_FINANCES_CACHE_TIME);
+      variable_set('bcb_finances_rates_last_update', time());
     }
 
   }

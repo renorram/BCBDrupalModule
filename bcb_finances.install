@@ -183,6 +183,20 @@ function bcb_finances_install() {
       drupal_write_record('bcb_finances_rate_serie', $register);
     }
   }
+}
 
-
+/**
+ * Adding suffix and prefix fields to render on simple rates table.
+ */
+function bcb_finances_update_7001() {
+  db_add_field('bcb_finances_simple_rates', 'prefix', [
+    'type' => 'varchar',
+    'length' => 255,
+    'description' => "Prefix for rate",
+  ]);
+  db_add_field('bcb_finances_simple_rates', 'suffix', [
+    'type' => 'varchar',
+    'length' => 255,
+    'description' => "Suffix for rate",
+  ]);
 }

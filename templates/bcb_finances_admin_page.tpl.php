@@ -43,6 +43,8 @@ $rates_table_vars = [
     ['data' => 'ID', 'field' => 'id', 'sort' => 'ASC'],
     ['data' => 'Nome', 'field' => 'rate_name', 'sort' => 'ASC'],
     ['data' => 'Indicador', 'field' => 'serie_code', 'sort' => 'ASC'],
+    ['data' => 'Prefixo',  'field' => 'prefix', 'sort' => 'ASC'],
+    ['data' => 'Sufixo',  'field' => 'suffix', 'sort' => 'ASC'],
     ['data' => '']
   ],
   'rows' => $data['rates'],
